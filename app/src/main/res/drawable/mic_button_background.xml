@@ -1,0 +1,11 @@
+<ripple xmlns:android="http://schemas.android.com/apk/res/android"
+    android:color="?attr/colorControlHighlight">
+    <item>
+        <shape android:shape="oval">
+            <solid android:color="@color/buttonColor" />
+            <size android:width="80dp" android:height="80dp" />
+            <corners android:radius="40dp" />
+            <elevation android:shadowColor="@color/shadowColor" android:elevation="8dp"/>
+        </shape>
+    </item>
+</ripple>

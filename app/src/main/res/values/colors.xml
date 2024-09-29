@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+    <!-- Background and text colors -->
+    <color name="backgroundColor">#F5F7FA</color>
+    <color name="primaryTextColor">#333333</color>
+    <color name="secondaryTextColor">#666666</color>
+    <color name="resultTextColor">#FF5733</color>
+
+    <!-- Mic button and icon colors -->
+    <color name="buttonColor">#4285F4</color> <!-- Blue -->
+    <color name="primaryIconColor">#FFFFFF</color>
+
+    <!-- Progress bar color -->
+    <color name="progressBarColor">#FF5733</color>
+
+    <!-- Shadow color -->
+    <color name="shadowColor">#22000000</color> <!-- Light shadow -->
+</resources>
