@@ -2,6 +2,7 @@ package com.example.emotiontrack;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
+import android.graphics.Color;
 import android.media.MediaRecorder;
 import android.os.Bundle;
 import android.os.Handler;
@@ -23,9 +24,9 @@ import androidx.core.content.ContextCompat;
 import org.json.JSONObject;
 
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -46,13 +47,15 @@ public class MainActivity extends AppCompatActivity {
     private MediaRecorder mediaRecorder;
     private ImageButton micButton;
     private TextView resultTextView;
-    private ProgressBar progressBar;
+    private SoundWaveView soundWaveView;
     private ImageView logoImageView;
     private boolean isRecording = false;
     private String audioFilePath;
-    private Animation pulseAnimation;
+    private Animation pulseAnimation, fadeInAnimation;
     private OkHttpClient httpClient;
     private ExecutorService executorService;
+    private Map<String, String> emotionEmojiMap;
+    private Map<String, Integer> emotionColorMap;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -61,12 +64,37 @@ public class MainActivity extends AppCompatActivity {
 
         micButton = findViewById(R.id.micButton);
         resultTextView = findViewById(R.id.resultTextView);
-        progressBar = findViewById(R.id.progressBar);
+        soundWaveView = findViewById(R.id.soundWaveView);
         logoImageView = findViewById(R.id.logoImageView);
 
         pulseAnimation = AnimationUtils.loadAnimation(this, R.anim.pulse);
+        fadeInAnimation = AnimationUtils.loadAnimation(this, R.anim.fade_in);
+
         httpClient = new OkHttpClient();
         executorService = Executors.newSingleThreadExecutor();
+
+        // Emoji and color mapping for each emotion
+        emotionEmojiMap = new HashMap<>();
+        emotionEmojiMap.put("neutral", "😐");
+        emotionEmojiMap.put("calm", "😌");
+        emotionEmojiMap.put("happy", "😊");
+        emotionEmojiMap.put("sad", "😢");
+        emotionEmojiMap.put("angry", "😡");
+        emotionEmojiMap.put("fearful", "😨");
+        emotionEmojiMap.put("disgust", "🤢");
+        emotionEmojiMap.put("surprised", "😲");
+        emotionEmojiMap.put("excited", "🤩");
+
+        emotionColorMap = new HashMap<>();
+        emotionColorMap.put("neutral", Color.parseColor("#808080"));     // Grey
+        emotionColorMap.put("calm", Color.parseColor("#ADD8E6"));       // Light Blue
+        emotionColorMap.put("happy", Color.parseColor("#FFD700"));      // Gold
+        emotionColorMap.put("sad", Color.parseColor("#4682B4"));        // Steel Blue
+        emotionColorMap.put("angry", Color.parseColor("#FF6347"));      // Tomato
+        emotionColorMap.put("fearful", Color.parseColor("#FF4500"));    // Orange Red
+        emotionColorMap.put("disgust", Color.parseColor("#8B4513"));    // Saddle Brown
+        emotionColorMap.put("surprised", Color.parseColor("#DA70D6"));  // Orchid
+        emotionColorMap.put("excited", Color.parseColor("#FF69B4"));    // Hot Pink
 
         micButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -123,7 +151,8 @@ public class MainActivity extends AppCompatActivity {
         logoImageView.clearAnimation();
 
         resultTextView.setText("Recording stopped. Analyzing emotion Please Wait...");
-
+        soundWaveView.stopAnimation();
+        soundWaveView.setVisibility(View.GONE);
         // Convert 3GP to WAV and send to API
         executorService.execute(new Runnable() {
             @Override
@@ -160,7 +189,6 @@ public class MainActivity extends AppCompatActivity {
             public void onFailure(@NonNull Call call, @NonNull IOException e) {
                 runOnUiThread(() -> {
                     resultTextView.setText("Error: Failed to send audio");
-                    progressBar.setVisibility(View.GONE);
                 });
                 Log.e(TAG, "API Request failed: " + e.getMessage());
             }
@@ -172,22 +200,26 @@ public class MainActivity extends AppCompatActivity {
                         String responseBody = response.body().string();
                         JSONObject jsonResponse = new JSONObject(responseBody);
                         String predictedEmotion = jsonResponse.getString("predicted_emotion");
+                        double confidence = jsonResponse.getDouble("confidence");
+
+                        String emoji = emotionEmojiMap.getOrDefault(predictedEmotion, "");
+                        int color = emotionColorMap.getOrDefault(predictedEmotion, Color.BLACK);
 
                         runOnUiThread(() -> {
-                            resultTextView.setText("Your Emotion: " + predictedEmotion);
-                            progressBar.setVisibility(View.GONE);
+                            resultTextView.setText(String.format("Your Emotion: %s %s\nAccuracy: %.2f%%", emoji, predictedEmotion, confidence));
+                            resultTextView.startAnimation(fadeInAnimation);
+                            resultTextView.setTextColor(color);
+                            getWindow().getDecorView().setBackgroundColor(color);
                         });
                     } catch (Exception e) {
                         runOnUiThread(() -> {
                             resultTextView.setText("Error: Failed to parse response");
-                            progressBar.setVisibility(View.GONE);
                         });
                         Log.e(TAG, "Error parsing API response: " + e.getMessage());
                     }
                 } else {
                     runOnUiThread(() -> {
                         resultTextView.setText("Error: API response error");
-                        progressBar.setVisibility(View.GONE);
                     });
                 }
             }
@@ -195,7 +227,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void startListeningAnimation() {
-        progressBar.setVisibility(View.VISIBLE);
+        soundWaveView.setVisibility(View.VISIBLE);
+        soundWaveView.startAnimation();
         logoImageView.startAnimation(pulseAnimation);
         resultTextView.setText("Listening...");
     }
@@ -212,12 +245,10 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
-        if (requestCode == REQUEST_AUDIO_PERMISSION_CODE) {
-            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
-                startRecording();
-            } else {
-                Toast.makeText(this, "Permission denied! Cannot record audio without permission.", Toast.LENGTH_SHORT).show();
-            }
+        if (requestCode == REQUEST_AUDIO_PERMISSION_CODE && grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+            startRecording();
+        } else {
+            Toast.makeText(this, "Permission Denied", Toast.LENGTH_SHORT).show();
         }
     }
 }
